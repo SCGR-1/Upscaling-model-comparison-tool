@@ -16,7 +16,7 @@ except Exception:
 
 from skimage.metrics import structural_similarity as ssim_sk
 from skimage.metrics import peak_signal_noise_ratio as psnr_sk
-from skimage.filters import laplace
+from skimage.filters import laplace, sobel
 
 try:
     LANCZOS = Image.Resampling.LANCZOS
@@ -43,10 +43,23 @@ def _pil_to_gray01(img: Image.Image) -> np.ndarray:
 
 
 def _lap_var(img: Image.Image) -> float:
+    """Laplacian variance (scaled by 1e6 for readability)."""
     g = _pil_to_gray01(img)
     # skimage.filters.laplace gives a float image centered around 0
     lap = laplace(g)
-    return float(np.var(lap, dtype=np.float64))
+    var = float(np.var(lap, dtype=np.float64))
+    return var * 1e6  # Scale for readability
+
+
+def _tenengrad(img: Image.Image) -> float:
+    """Tenengrad sharpness metric (sum of squared gradients)."""
+    g = _pil_to_gray01(img)
+    # Sobel operator for gradients
+    grad_x = sobel(g, axis=1)
+    grad_y = sobel(g, axis=0)
+    # Sum of squared gradients
+    tenengrad = float(np.sum(grad_x**2 + grad_y**2))
+    return tenengrad
 
 
 def _downscale_to(img: Image.Image, w: int, h: int) -> Image.Image:
@@ -97,7 +110,7 @@ def compute_upscale_metrics(
     ow, oh = orig_rgb.size
 
     # 1) No-reference metrics on the upscaled result
-    no_ref = {"NIQE": None, "BRISQUE": None, "LaplacianVar": None}
+    no_ref = {"NIQE": None, "BRISQUE": None, "LaplacianVar": None, "Tenengrad": None}
     availability = {"pyiqa": _HAS_PYIQA}
 
     if _HAS_PYIQA:
@@ -117,6 +130,7 @@ def compute_upscale_metrics(
     no_ref["NIQE"] = _safe_metric(niqe, x_up, device) if niqe else None
     no_ref["BRISQUE"] = _safe_metric(brisque, x_up, device) if brisque else None
     no_ref["LaplacianVar"] = _lap_var(up_rgb)
+    no_ref["Tenengrad"] = _tenengrad(up_rgb)
 
     # 2) Downscale consistency to original size
     up_down = _downscale_to(up_rgb, ow, oh)
@@ -133,6 +147,7 @@ def compute_upscale_metrics(
             "NIQE": _safe_metric(niqe, _pil_to_tensor01(bic), device) if niqe else None,
             "BRISQUE": _safe_metric(brisque, _pil_to_tensor01(bic), device) if brisque else None,
             "LaplacianVar": _lap_var(bic),
+            "Tenengrad": _tenengrad(bic),
         }
         # Downscale consistency for bicubic
         bic_down = _downscale_to(bic, ow, oh)
@@ -142,6 +157,7 @@ def compute_upscale_metrics(
             "NIQE": b_no_ref["NIQE"],
             "BRISQUE": b_no_ref["BRISQUE"],
             "LaplacianVar": b_no_ref["LaplacianVar"],
+            "Tenengrad": b_no_ref["Tenengrad"],
             "Downscale_PSNR": b_cons["PSNR"],
             "Downscale_SSIM": b_cons["SSIM"],
         }
@@ -156,6 +172,7 @@ def compute_upscale_metrics(
             "NIQE": _delta(no_ref["NIQE"], baseline["NIQE"], invert=True),  # baseline - upscaled (positive = better)
             "BRISQUE": _delta(no_ref["BRISQUE"], baseline["BRISQUE"], invert=True),  # baseline - upscaled (positive = better)
             "LaplacianVar": no_ref["LaplacianVar"] - baseline["LaplacianVar"],  # upscaled - baseline (positive = better)
+            "Tenengrad": no_ref["Tenengrad"] - baseline["Tenengrad"],  # upscaled - baseline (positive = better)
             "PSNR": down_cons["PSNR"] - baseline["Downscale_PSNR"],  # upscaled - baseline (positive = better)
             "SSIM": down_cons["SSIM"] - baseline["Downscale_SSIM"],  # upscaled - baseline (positive = better)
         }

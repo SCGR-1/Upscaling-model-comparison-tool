@@ -514,6 +514,10 @@ def frontend():
                                 <img src="/output/${encodeURIComponent(data.output_filename)}" alt="Upscaled">
                             </div>
                         </div>
+                        <div style="margin-top:12px;padding:10px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;font-size:13px;color:#856404">
+                            <strong>💡 Tip:</strong> View images at full resolution (100% zoom) to see sharpness differences. 
+                            ${data.scale >= 8 ? 'High-scale upscales (8×/16×) work best on high-detail source images and may take longer to process.' : ''}
+                        </div>
                     `;
                     
                     if (data.metrics) {
@@ -533,11 +537,13 @@ def frontend():
 Availability: ${JSON.stringify(m.availability || {}, null, 2)}
 
 Note: Lower is better for NIQE and BRISQUE. Higher is better for all others.
+LaplacianVar is scaled by 1e6 for readability.
 
 No-reference on Upscaled:
   NIQE: ${pretty(m.no_reference?.NIQE)} (lower is better)
   BRISQUE: ${pretty(m.no_reference?.BRISQUE)} (lower is better)
-  LaplacianVar: ${pretty(m.no_reference?.LaplacianVar)}
+  LaplacianVar: ${pretty(m.no_reference?.LaplacianVar)} (×1e6, higher = sharper)
+  Tenengrad: ${pretty(m.no_reference?.Tenengrad)} (higher = sharper)
 
 Downscale Consistency (compare downscaled-upscaled vs original):
   PSNR: ${pretty(m.downscale_consistency?.PSNR)} dB
@@ -549,7 +555,8 @@ Downscale Consistency (compare downscaled-upscaled vs original):
 Baseline Bicubic @ same size:
   NIQE: ${pretty(m.baseline_bicubic.NIQE)}
   BRISQUE: ${pretty(m.baseline_bicubic.BRISQUE)}
-  LaplacianVar: ${pretty(m.baseline_bicubic.LaplacianVar)}
+  LaplacianVar: ${pretty(m.baseline_bicubic.LaplacianVar)} (×1e6)
+  Tenengrad: ${pretty(m.baseline_bicubic.Tenengrad)}
   PSNR: ${pretty(m.baseline_bicubic.Downscale_PSNR)} dB
   SSIM: ${pretty(m.baseline_bicubic.Downscale_SSIM)}
 `;
@@ -560,7 +567,8 @@ Baseline Bicubic @ same size:
 Deltas vs Bicubic (positive = your upscaler better; NIQE/BRISQUE inverted):
   ΔNIQE: ${pretty(m.deltas_vs_bicubic.NIQE)}
   ΔBRISQUE: ${pretty(m.deltas_vs_bicubic.BRISQUE)}
-  ΔLaplacianVar: ${pretty(m.deltas_vs_bicubic.LaplacianVar)}
+  ΔLaplacianVar: ${pretty(m.deltas_vs_bicubic.LaplacianVar)} (×1e6)
+  ΔTenengrad: ${pretty(m.deltas_vs_bicubic.Tenengrad)}
   ΔPSNR: ${pretty(m.deltas_vs_bicubic.PSNR)} dB
   ΔSSIM: ${pretty(m.deltas_vs_bicubic.SSIM)}
 `;

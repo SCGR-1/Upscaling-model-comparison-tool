@@ -9,7 +9,8 @@ torchvision
 py-real-esrgan
 super-image
 
-# Optional: Metrics tools
-pyiqa
-scikit-image
+# Optional: Metrics tools (install for quality metrics)
+# If installation fails, metrics will be disabled gracefully
+pyiqa>=0.1.0
+scikit-image>=0.19.0
 

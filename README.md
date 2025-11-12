@@ -11,7 +11,7 @@ A FastAPI-based image upscaling service with multiple backend support and qualit
   - Cascaded upscaling for higher scales (8×, 16×)
 
 - **Quality Metrics:**
-  - No-reference metrics: NIQE, BRISQUE, Laplacian Variance
+  - No-reference metrics: NIQE, BRISQUE, Laplacian Variance (scaled), Tenengrad
   - Downscale consistency: PSNR, SSIM
   - Comparison with bicubic baseline
   - Delta metrics showing improvement over bicubic
@@ -87,8 +87,19 @@ upscaler-service/
 
 ## Notes
 
-- Maximum output size is capped at 16384px on the long edge by default
+- **Maximum output size** is capped at 16384px on the long edge by default
 - Images are automatically resized if they exceed the cap
-- Processing can be cancelled using the cancel button or API endpoint
-- Metrics computation requires optional dependencies (`pyiqa`, `scikit-image`)
+- **Processing can be cancelled** using the cancel button or API endpoint
+- **Metrics computation** requires optional dependencies (`pyiqa`, `scikit-image`)
+- **Viewing results**: For best visual assessment, view output images at 100% zoom (full resolution) to see sharpness differences
+- **High-scale upscaling (8×/16×)**:
+  - Works best on high-detail source images
+  - Expect slower processing times
+  - Requires more VRAM
+  - Benefits are most visible on detailed, high-quality source images
+- **Metrics interpretation**:
+  - Lower is better: NIQE, BRISQUE
+  - Higher is better: LaplacianVar (scaled ×1e6), Tenengrad, PSNR, SSIM
+  - LaplacianVar and Tenengrad measure sharpness/high-frequency detail
+  - Downscale consistency metrics (PSNR/SSIM) compare how well the upscaled image matches the original when downsampled
 
