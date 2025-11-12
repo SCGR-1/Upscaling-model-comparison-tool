@@ -1,0 +1,169 @@
+# metrics_tools.py
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Dict, Any, Optional
+
+import numpy as np
+from PIL import Image
+import torch
+
+# Optional deps
+_HAS_PYIQA = True
+try:
+    import pyiqa  # NIQE, BRISQUE
+except Exception:
+    _HAS_PYIQA = False
+
+from skimage.metrics import structural_similarity as ssim_sk
+from skimage.metrics import peak_signal_noise_ratio as psnr_sk
+from skimage.filters import laplace
+
+try:
+    LANCZOS = Image.Resampling.LANCZOS
+except AttributeError:
+    LANCZOS = Image.LANCZOS
+
+
+def _pil_to_tensor01(img: Image.Image) -> torch.Tensor:
+    """HWC uint8 -> 1xCxHxW float32 in [0,1]."""
+    arr = np.asarray(img, dtype=np.uint8)
+    if arr.ndim == 2:
+        arr = np.stack([arr, arr, arr], axis=-1)
+    if arr.shape[2] == 4:  # drop alpha for metrics
+        arr = arr[:, :, :3]
+    t = torch.from_numpy(arr).float() / 255.0
+    t = t.permute(2, 0, 1).unsqueeze(0).contiguous()
+    return t
+
+
+def _pil_to_gray01(img: Image.Image) -> np.ndarray:
+    g = img.convert("L")
+    a = np.asarray(g, dtype=np.float32) / 255.0
+    return a
+
+
+def _lap_var(img: Image.Image) -> float:
+    g = _pil_to_gray01(img)
+    # skimage.filters.laplace gives a float image centered around 0
+    lap = laplace(g)
+    return float(np.var(lap, dtype=np.float64))
+
+
+def _downscale_to(img: Image.Image, w: int, h: int) -> Image.Image:
+    return img.resize((w, h), LANCZOS)
+
+
+def _psnr_ssim(a: Image.Image, b: Image.Image) -> Dict[str, float]:
+    a_np = np.asarray(a.convert("RGB"), dtype=np.float32) / 255.0
+    b_np = np.asarray(b.convert("RGB"), dtype=np.float32) / 255.0
+    # Channel-wise SSIM averaged
+    ssim_val = 0.0
+    for c in range(3):
+        ssim_val += ssim_sk(a_np[..., c], b_np[..., c], data_range=1.0)
+    ssim_val /= 3.0
+    psnr_val = psnr_sk(a_np, b_np, data_range=1.0)
+    return {"PSNR": float(psnr_val), "SSIM": float(ssim_val)}
+
+
+def _safe_metric(model, x: torch.Tensor, device: torch.device) -> Optional[float]:
+    try:
+        with torch.no_grad():
+            val = float(model(x.to(device)).item())
+        return val
+    except Exception:
+        return None
+
+
+def compute_upscale_metrics(
+    upscaled_pil: Image.Image,
+    original_pil: Image.Image,
+    compare_bicubic: bool = True,
+    device: Optional[torch.device] = None,
+) -> Dict[str, Any]:
+    """
+    No-ground-truth "combo":
+      - No-reference: NIQE, BRISQUE, Laplacian variance on the upscaled.
+      - Downscale consistency: PSNR, SSIM between downscaled(upscaled) and original.
+      - Baseline: same metrics for bicubic at the same output size.
+      - Deltas vs Bicubic: positive is better, NIQE inverted (lower is better).
+
+    Returns a plain dict safe for JSON.
+    """
+    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Ensure RGB without alpha for metrics
+    up_rgb = upscaled_pil.convert("RGB")
+    orig_rgb = original_pil.convert("RGB")
+    ow, oh = orig_rgb.size
+
+    # 1) No-reference metrics on the upscaled result
+    no_ref = {"NIQE": None, "BRISQUE": None, "LaplacianVar": None}
+    availability = {"pyiqa": _HAS_PYIQA}
+
+    if _HAS_PYIQA:
+        try:
+            niqe = pyiqa.create_metric("niqe").to(device).eval()
+        except Exception:
+            niqe = None
+        try:
+            brisque = pyiqa.create_metric("brisque").to(device).eval()
+        except Exception:
+            brisque = None
+    else:
+        niqe = None
+        brisque = None
+
+    x_up = _pil_to_tensor01(up_rgb)
+    no_ref["NIQE"] = _safe_metric(niqe, x_up, device) if niqe else None
+    no_ref["BRISQUE"] = _safe_metric(brisque, x_up, device) if brisque else None
+    no_ref["LaplacianVar"] = _lap_var(up_rgb)
+
+    # 2) Downscale consistency to original size
+    up_down = _downscale_to(up_rgb, ow, oh)
+    down_cons = _psnr_ssim(orig_rgb, up_down)
+
+    # 3) Bicubic baseline at the same final size
+    baseline = None
+    deltas = None
+    if compare_bicubic:
+        up_w, up_h = up_rgb.size
+        bic = orig_rgb.resize((up_w, up_h), LANCZOS)
+        # No-reference on bicubic
+        b_no_ref = {
+            "NIQE": _safe_metric(niqe, _pil_to_tensor01(bic), device) if niqe else None,
+            "BRISQUE": _safe_metric(brisque, _pil_to_tensor01(bic), device) if brisque else None,
+            "LaplacianVar": _lap_var(bic),
+        }
+        # Downscale consistency for bicubic
+        bic_down = _downscale_to(bic, ow, oh)
+        b_cons = _psnr_ssim(orig_rgb, bic_down)
+
+        baseline = {
+            "NIQE": b_no_ref["NIQE"],
+            "BRISQUE": b_no_ref["BRISQUE"],
+            "LaplacianVar": b_no_ref["LaplacianVar"],
+            "Downscale_PSNR": b_cons["PSNR"],
+            "Downscale_SSIM": b_cons["SSIM"],
+        }
+
+        # Deltas vs bicubic. NIQE polarity inverted so positive means better.
+        def _delta(a, b, invert=False):
+            if a is None or b is None:
+                return None
+            return float((b - a) if invert else (a - b))
+
+        deltas = {
+            "NIQE": _delta(no_ref["NIQE"], baseline["NIQE"], invert=True),  # baseline - upscaled (positive = better)
+            "BRISQUE": _delta(no_ref["BRISQUE"], baseline["BRISQUE"], invert=True),  # baseline - upscaled (positive = better)
+            "LaplacianVar": no_ref["LaplacianVar"] - baseline["LaplacianVar"],  # upscaled - baseline (positive = better)
+            "PSNR": down_cons["PSNR"] - baseline["Downscale_PSNR"],  # upscaled - baseline (positive = better)
+            "SSIM": down_cons["SSIM"] - baseline["Downscale_SSIM"],  # upscaled - baseline (positive = better)
+        }
+
+    return {
+        "availability": availability,
+        "no_reference": no_ref,
+        "downscale_consistency": down_cons,
+        "baseline_bicubic": baseline,
+        "deltas_vs_bicubic": deltas,
+    }

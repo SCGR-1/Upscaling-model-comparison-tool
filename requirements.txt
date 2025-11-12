@@ -1,0 +1,15 @@
+# Core dependencies
+fastapi
+pillow
+numpy
+torch
+torchvision
+
+# Optional: Upscaling backends
+py-real-esrgan
+super-image
+
+# Optional: Metrics tools
+pyiqa
+scikit-image
+
