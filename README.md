@@ -55,34 +55,70 @@ pip install pyiqa scikit-image
 
 4. Select an image, choose backend and scale, then click "Upscale Image"
 
+### Batch Processing
+
+- Enable "Batch mode" checkbox to process all images in `pictures/input/`
+- Outputs are saved to `pictures/{backend}/` folder
+- A metrics JSON file is generated with all results and percentile statistics
+- Processing time and percentile metrics are displayed in the UI
+
+### Input Metrics
+
+- Click "Compute Input Metrics" to analyze all input images
+- Computes no-reference quality metrics (NIQE, BRISQUE, LaplacianVar, Tenengrad)
+- Results are saved to `pictures/input/input_metrics_{timestamp}.json`
+- Useful for understanding input image quality before upscaling
+
 ## API Endpoints
 
 - `GET /` - Web UI
-- `POST /upscale` - Upscale an image
+- `POST /upscale` - Upscale a single image
   - Query parameters:
     - `filename`: Name of image file in `pictures/input/`
     - `backend`: `realesrgan`, `pan`, or `edsr`
     - `scale`: 2, 3, 4, 8, or 16
     - `metrics`: `true` or `false` (default: `true`)
     - `request_id`: Optional request ID for cancellation
-- `POST /cancel` - Cancel an in-progress upscale operation
+- `POST /batch` - Batch upscale all images in `pictures/input/`
+  - Query parameters:
+    - `backend`: `realesrgan`, `pan`, or `edsr`
+    - `scale`: 2, 3, 4, 8, or 16
+    - `metrics`: `true` or `false` (default: `true`)
+    - `request_id`: Optional request ID for cancellation
+  - Outputs to `pictures/{backend}/` folder with metrics JSON file
+  - Returns percentile statistics (25th, 50th, 75th) for all metrics
+- `POST /compute-input-metrics` - Compute quality metrics for all input images
+  - Query parameters:
+    - `request_id`: Optional request ID for cancellation
+  - Saves metrics to `pictures/input/input_metrics_{timestamp}.json`
+- `POST /cancel` - Cancel an in-progress operation
+  - Query parameters:
+    - `request_id`: Request ID to cancel
 - `GET /api/images` - List available input images
-- `GET /api/backends` - List available backends
+- `GET /api/backends` - List available backends and their status
+- `GET /api/config` - Get configuration (max output size, etc.)
 - `GET /input/{filename}` - Get input image
 - `GET /output/{filename}` - Get output image
-- `GET /health` - Health check
+- `GET /health` - Health check endpoint
 
 ## Project Structure
 
 ```
 upscaler-service/
-├── app.py              # FastAPI application
-├── metrics_tools.py    # Quality metrics computation
-├── requirements.txt    # Python dependencies
+├── app.py                 # Main FastAPI application and routes
+├── config.py              # Configuration constants and settings
+├── models.py              # Model loading and management
+├── image_processing.py    # Image processing and upscaling functions
+├── utils.py               # Utility functions (path safety, size calculations, etc.)
+├── cancellation.py        # Request cancellation handling
+├── frontend.py            # Frontend HTML template loader
+├── frontend.html          # HTML/JavaScript frontend template
+├── metrics_tools.py       # Quality metrics computation
+├── requirements.txt       # Python dependencies
 ├── pictures/
-│   ├── input/         # Input images
-│   └── output/        # Upscaled images
-└── weights/           # Model weights
+│   ├── input/            # Input images (place your images here)
+│   └── output/           # Upscaled images
+└── weights/              # Model weights (downloaded automatically)
 ```
 
 ## Notes

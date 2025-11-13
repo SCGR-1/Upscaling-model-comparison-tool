@@ -52,13 +52,14 @@ def _lap_var(img: Image.Image) -> float:
 
 
 def _tenengrad(img: Image.Image) -> float:
-    """Tenengrad sharpness metric (sum of squared gradients)."""
+    """Tenengrad sharpness metric (mean of squared gradients, normalized by image size)."""
     g = _pil_to_gray01(img)
     # Sobel operator for gradients
     grad_x = sobel(g, axis=1)
     grad_y = sobel(g, axis=0)
-    # Sum of squared gradients
-    tenengrad = float(np.sum(grad_x**2 + grad_y**2))
+    # Mean of squared gradients (normalized by pixel count for comparability across sizes)
+    h, w = g.shape
+    tenengrad = float(np.mean(grad_x**2 + grad_y**2))
     return tenengrad
 
 
@@ -111,7 +112,13 @@ def compute_upscale_metrics(
 
     # 1) No-reference metrics on the upscaled result
     no_ref = {"NIQE": None, "BRISQUE": None, "LaplacianVar": None, "Tenengrad": None}
-    availability = {"pyiqa": _HAS_PYIQA}
+    # Track availability of all metrics
+    availability = {
+        "pyiqa": _HAS_PYIQA,
+        "scikit-image": True,  # Always available (required import)
+        "laplacian_var": True,  # Always available (uses scikit-image)
+        "tenengrad": True,  # Always available (uses scikit-image)
+    }
 
     if _HAS_PYIQA:
         try:
@@ -137,6 +144,9 @@ def compute_upscale_metrics(
     down_cons = _psnr_ssim(orig_rgb, up_down)
 
     # 3) Bicubic baseline at the same final size
+    # Note: If source input has little detail, the bicubic baseline may closely match
+    # the upscaled output when downscaled, so downscale PSNR/SSIM for upscaled may trail.
+    # This is expected behavior and indicates the upscaler is preserving the original structure.
     baseline = None
     deltas = None
     if compare_bicubic:
