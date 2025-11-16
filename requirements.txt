@@ -8,6 +8,7 @@ torchvision
 # Optional: Upscaling backends
 py-real-esrgan
 super-image
+basicsr>=1.4.2
 
 # Optional: Metrics tools (install for quality metrics)
 # If installation fails, metrics will be disabled gracefully

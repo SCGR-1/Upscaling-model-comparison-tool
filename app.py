@@ -17,7 +17,7 @@ from config import (
     PICTURES_DIR, OUTPUT_DIR, MAX_OUT_LONG_EDGE, ENFORCE_OUTPUT_CAP,
     COMMON_IMG_HEADERS, LANCZOS, device
 )
-from models import have_realesrgan, have_pan, have_edsr, warmup_models
+from models import have_realesrgan, have_pan, have_edsr, have_swinir, warmup_models
 from utils import safe_join, _etag_for, target_size
 from image_processing import upscale_multi
 from cancellation import (
@@ -72,7 +72,7 @@ def list_images():
 @app.get("/api/backends")
 def backends():
     """Get available backend status."""
-    return {"realesrgan": have_realesrgan, "pan": have_pan, "edsr": have_edsr}
+    return {"realesrgan": have_realesrgan, "pan": have_pan, "edsr": have_edsr, "swinir": have_swinir}
 
 
 @app.get("/api/config")
@@ -114,9 +114,15 @@ def health():
 @app.on_event("shutdown")
 def _shutdown():
     """Cleanup on shutdown."""
-    _executor.shutdown(wait=False, cancel_futures=True)
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+    try:
+        _executor.shutdown(wait=False, cancel_futures=True)
+    except Exception:
+        pass  # Ignore errors during shutdown
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass  # Ignore errors during shutdown
 
 
 @app.post("/cancel")
@@ -130,7 +136,7 @@ async def cancel_upscale(request_id: str = Query(..., description="Request ID to
 @app.post("/upscale")
 async def upscale(
     filename: str = Query(..., description="Name of the image file in /pictures/input directory"),
-    backend: str = Query("realesrgan", pattern="^(realesrgan|pan|edsr)$"),
+    backend: str = Query("realesrgan", pattern="^(realesrgan|pan|edsr|swinir)$"),
     scale: int = Query(4, ge=2, le=16),
     request_id: str = Query(None, description="Request ID for cancellation"),
     metrics: bool = Query(True, description="Compute quality metrics"),
@@ -291,7 +297,7 @@ def _calculate_percentiles(values: list, percentiles: list = [25, 50, 75]) -> li
 
 @app.post("/batch")
 async def batch_upscale(
-    backend: str = Query("realesrgan", pattern="^(realesrgan|pan|edsr)$"),
+    backend: str = Query("realesrgan", pattern="^(realesrgan|pan|edsr|swinir)$"),
     scale: int = Query(4, ge=2, le=16),
     request_id: str = Query(None, description="Request ID for cancellation"),
     metrics: bool = Query(True, description="Compute quality metrics"),

@@ -8,6 +8,7 @@ A FastAPI-based image upscaling service with multiple backend support and qualit
   - Real-ESRGAN (4×)
   - PAN (2×, 3×, 4×)
   - EDSR (2×, 3×, 4×)
+  - SwinIR (2×, 3×, 4×, 8×)
   - Cascaded upscaling for higher scales (8×, 16×)
 
 - **Quality Metrics:**
@@ -23,7 +24,16 @@ A FastAPI-based image upscaling service with multiple backend support and qualit
 pip install -r requirements.txt
 ```
 
-2. Optional metrics dependencies (for full metrics support):
+2. Download SwinIR weights (optional, only if using SwinIR backend):
+```bash
+python download_swinir_weights.py
+```
+   Or download specific scales:
+```bash
+python download_swinir_weights.py 2 4 8
+```
+
+3. Optional metrics dependencies (for full metrics support):
 ```bash
 pip install pyiqa scikit-image
 ```
@@ -75,13 +85,13 @@ pip install pyiqa scikit-image
 - `POST /upscale` - Upscale a single image
   - Query parameters:
     - `filename`: Name of image file in `pictures/input/`
-    - `backend`: `realesrgan`, `pan`, or `edsr`
+    - `backend`: `realesrgan`, `pan`, `edsr`, or `swinir`
     - `scale`: 2, 3, 4, 8, or 16
     - `metrics`: `true` or `false` (default: `true`)
     - `request_id`: Optional request ID for cancellation
 - `POST /batch` - Batch upscale all images in `pictures/input/`
   - Query parameters:
-    - `backend`: `realesrgan`, `pan`, or `edsr`
+    - `backend`: `realesrgan`, `pan`, `edsr`, or `swinir`
     - `scale`: 2, 3, 4, 8, or 16
     - `metrics`: `true` or `false` (default: `true`)
     - `request_id`: Optional request ID for cancellation
@@ -118,8 +128,20 @@ upscaler-service/
 ├── pictures/
 │   ├── input/            # Input images (place your images here)
 │   └── output/           # Upscaled images
-└── weights/              # Model weights (downloaded automatically)
+└── weights/              # Model weights
+    ├── swinir/          # SwinIR weights (download using download_swinir_weights.py)
+    └── RealESRGAN_x4.pth
 ```
+
+## Backend Details
+
+### SwinIR
+- **Scales supported**: 2×, 3×, 4×, 8×
+- **Model**: Classical SR (SwinIR-M) trained on DIV2K
+- **Weights**: Download using `download_swinir_weights.py` script
+- **Dependencies**: Requires `basicsr` package (included in requirements.txt)
+- **Performance**: Generally slower than PAN/EDSR but often produces higher quality results
+- **Memory**: Uses tiling for large images to manage VRAM usage
 
 ## Notes
 

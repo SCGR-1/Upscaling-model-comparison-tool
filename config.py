@@ -13,6 +13,7 @@ BACKEND_STEPS = {
     "realesrgan": [4],       # Only x4 weights loaded
     "pan":        [2, 3, 4],
     "edsr":       [2, 3, 4],
+    "swinir":     [2, 3, 4, 8],
 }
 
 # Directory paths
