@@ -433,6 +433,14 @@ Deltas vs Bicubic (positive = upscaler better):
   ΔTenengrad: ${pretty(p.deltas_vs_bicubic?.Tenengrad?.[0])} / ${pretty(p.deltas_vs_bicubic?.Tenengrad?.[1])} / ${pretty(p.deltas_vs_bicubic?.Tenengrad?.[2])}
   ΔPSNR: ${pretty(p.deltas_vs_bicubic?.PSNR?.[0])} / ${pretty(p.deltas_vs_bicubic?.PSNR?.[1])} / ${pretty(p.deltas_vs_bicubic?.PSNR?.[2])} dB
   ΔSSIM: ${pretty(p.deltas_vs_bicubic?.SSIM?.[0])} / ${pretty(p.deltas_vs_bicubic?.SSIM?.[1])} / ${pretty(p.deltas_vs_bicubic?.SSIM?.[2])}
+
+VRAM Usage (MB):
+  Allocated: ${pretty(p.vram_usage?.allocated_mb?.[0])} / ${pretty(p.vram_usage?.allocated_mb?.[1])} / ${pretty(p.vram_usage?.allocated_mb?.[2])} MB
+  Reserved:  ${pretty(p.vram_usage?.reserved_mb?.[0])} / ${pretty(p.vram_usage?.reserved_mb?.[1])} / ${pretty(p.vram_usage?.reserved_mb?.[2])} MB
+  ${p.vram_usage?.total_mb?.[1] ? `Total:     ${pretty(p.vram_usage?.total_mb?.[0])} / ${pretty(p.vram_usage?.total_mb?.[1])} / ${pretty(p.vram_usage?.total_mb?.[2])} MB` : ''}
+  ${p.vram_usage?.used_mb?.[1] ? `Used:      ${pretty(p.vram_usage?.used_mb?.[0])} / ${pretty(p.vram_usage?.used_mb?.[1])} / ${pretty(p.vram_usage?.used_mb?.[2])} MB` : ''}
+  ${p.vram_usage?.free_mb?.[1] ? `Free:      ${pretty(p.vram_usage?.free_mb?.[0])} / ${pretty(p.vram_usage?.free_mb?.[1])} / ${pretty(p.vram_usage?.free_mb?.[2])} MB` : ''}
+  ${p.vram_usage?.utilization_percent?.[1] ? `Utilization: ${pretty(p.vram_usage?.utilization_percent?.[0])} / ${pretty(p.vram_usage?.utilization_percent?.[1])} / ${pretty(p.vram_usage?.utilization_percent?.[2])} %` : ''}
                                     </pre>
                                 </div>
                             `;
@@ -478,6 +486,8 @@ Deltas vs Bicubic (positive = upscaler better):
                     if (data.metrics) {
                         try {
                             const m = data.metrics;
+                            console.log('Metrics data:', m);
+                            console.log('VRAM usage:', m.vram_usage);
                             const pretty = s => {
                                 if (s === null || s === undefined) return '—';
                                 if (typeof s === 'number' && (isNaN(s) || !isFinite(s))) return '—';
@@ -528,6 +538,39 @@ Deltas vs Bicubic (positive = your upscaler better; NIQE/BRISQUE inverted):
   ΔSSIM: ${pretty(m.deltas_vs_bicubic.SSIM)}
 `;
                             }
+                            
+                            // Always show VRAM section
+                            metricsHtml += `
+VRAM Usage:`;
+                            if (m.vram_usage) {
+                                const v = m.vram_usage;
+                                metricsHtml += `
+  Allocated: ${pretty(v.allocated_mb)} MB
+  Reserved:  ${pretty(v.reserved_mb)} MB`;
+                                if (v.total_mb !== null && v.total_mb !== undefined) {
+                                    metricsHtml += `
+  Total:     ${pretty(v.total_mb)} MB`;
+                                }
+                                if (v.used_mb !== null && v.used_mb !== undefined) {
+                                    metricsHtml += `
+  Used:      ${pretty(v.used_mb)} MB`;
+                                }
+                                if (v.free_mb !== null && v.free_mb !== undefined) {
+                                    metricsHtml += `
+  Free:      ${pretty(v.free_mb)} MB`;
+                                }
+                                if (v.utilization_percent !== null && v.utilization_percent !== undefined) {
+                                    metricsHtml += `
+  Utilization: ${pretty(v.utilization_percent)} %`;
+                                }
+                                metricsHtml += `
+  Method: ${v.method || 'unknown'}`;
+                            } else {
+                                metricsHtml += `
+  Not available (check console for details)`;
+                            }
+                            metricsHtml += `
+`;
                             
                             metricsHtml += `                                </pre>
                                 </div>`;
@@ -627,6 +670,14 @@ No-reference metrics:
   BRISQUE:  ${pretty(p.no_reference?.BRISQUE?.[0])} / ${pretty(p.no_reference?.BRISQUE?.[1])} / ${pretty(p.no_reference?.BRISQUE?.[2])} (lower is better)
   LaplacianVar: ${pretty(p.no_reference?.LaplacianVar?.[0])} / ${pretty(p.no_reference?.LaplacianVar?.[1])} / ${pretty(p.no_reference?.LaplacianVar?.[2])} (×1e6, higher = sharper)
   Tenengrad: ${pretty(p.no_reference?.Tenengrad?.[0])} / ${pretty(p.no_reference?.Tenengrad?.[1])} / ${pretty(p.no_reference?.Tenengrad?.[2])} (higher = sharper)
+
+VRAM Usage (MB):
+  Allocated: ${pretty(p.vram_usage?.allocated_mb?.[0])} / ${pretty(p.vram_usage?.allocated_mb?.[1])} / ${pretty(p.vram_usage?.allocated_mb?.[2])} MB
+  Reserved:  ${pretty(p.vram_usage?.reserved_mb?.[0])} / ${pretty(p.vram_usage?.reserved_mb?.[1])} / ${pretty(p.vram_usage?.reserved_mb?.[2])} MB
+  ${p.vram_usage?.total_mb?.[1] ? `Total:     ${pretty(p.vram_usage?.total_mb?.[0])} / ${pretty(p.vram_usage?.total_mb?.[1])} / ${pretty(p.vram_usage?.total_mb?.[2])} MB` : ''}
+  ${p.vram_usage?.used_mb?.[1] ? `Used:      ${pretty(p.vram_usage?.used_mb?.[0])} / ${pretty(p.vram_usage?.used_mb?.[1])} / ${pretty(p.vram_usage?.used_mb?.[2])} MB` : ''}
+  ${p.vram_usage?.free_mb?.[1] ? `Free:      ${pretty(p.vram_usage?.free_mb?.[0])} / ${pretty(p.vram_usage?.free_mb?.[1])} / ${pretty(p.vram_usage?.free_mb?.[2])} MB` : ''}
+  ${p.vram_usage?.utilization_percent?.[1] ? `Utilization: ${pretty(p.vram_usage?.utilization_percent?.[0])} / ${pretty(p.vram_usage?.utilization_percent?.[1])} / ${pretty(p.vram_usage?.utilization_percent?.[2])} %` : ''}
                                 </pre>
                             </div>
                         `;

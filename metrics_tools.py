@@ -14,6 +14,13 @@ try:
 except Exception:
     _HAS_PYIQA = False
 
+_HAS_PYNVML = True
+_PYNVML_INITIALIZED = False
+try:
+    import pynvml
+except Exception:
+    _HAS_PYNVML = False
+
 from skimage.metrics import structural_similarity as ssim_sk
 from skimage.metrics import peak_signal_noise_ratio as psnr_sk
 from skimage.filters import laplace, sobel
@@ -61,6 +68,82 @@ def _tenengrad(img: Image.Image) -> float:
     h, w = g.shape
     tenengrad = float(np.mean(grad_x**2 + grad_y**2))
     return tenengrad
+
+
+def get_vram_usage(device: Optional[torch.device] = None) -> Dict[str, Any]:
+    """
+    Get current GPU VRAM usage information.
+    
+    Returns a dict with:
+    - allocated_mb: PyTorch allocated memory in MB
+    - reserved_mb: PyTorch reserved memory in MB
+    - total_mb: Total GPU memory in MB (if available via pynvml)
+    - used_mb: Total GPU used memory in MB (if available via pynvml)
+    - free_mb: Total GPU free memory in MB (if available via pynvml)
+    - utilization_percent: GPU memory utilization percentage (if available)
+    - method: "pynvml" or "torch" indicating which method was used
+    
+    Returns zeros if CUDA is not available.
+    """
+    result = {
+        "allocated_mb": 0.0,
+        "reserved_mb": 0.0,
+        "total_mb": None,
+        "used_mb": None,
+        "free_mb": None,
+        "utilization_percent": None,
+        "method": "none",
+        "available": False
+    }
+    
+    if not torch.cuda.is_available():
+        return result
+    
+    device = device or torch.device("cuda")
+    if device.type != "cuda":
+        return result
+    
+    # Get PyTorch memory stats
+    try:
+        allocated_bytes = torch.cuda.memory_allocated(device)
+        reserved_bytes = torch.cuda.memory_reserved(device)
+        result["allocated_mb"] = allocated_bytes / (1024 ** 2)
+        result["reserved_mb"] = reserved_bytes / (1024 ** 2)
+        result["available"] = True
+    except Exception:
+        pass
+    
+    # Try pynvml for more precise GPU memory info
+    if _HAS_PYNVML:
+        try:
+            global _PYNVML_INITIALIZED
+            if not _PYNVML_INITIALIZED:
+                pynvml.nvmlInit()
+                _PYNVML_INITIALIZED = True
+            
+            device_index = device.index if device.index is not None else 0
+            handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
+            
+            # Get memory info
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            result["total_mb"] = mem_info.total / (1024 ** 2)
+            result["used_mb"] = mem_info.used / (1024 ** 2)
+            result["free_mb"] = mem_info.free / (1024 ** 2)
+            
+            if result["total_mb"] > 0:
+                result["utilization_percent"] = (result["used_mb"] / result["total_mb"]) * 100.0
+            
+            result["method"] = "pynvml"
+        except Exception:
+            # Fallback to torch method
+            if result["available"]:
+                result["method"] = "torch"
+    else:
+        # Use torch method only
+        if result["available"]:
+            result["method"] = "torch"
+    
+    return result
 
 
 def _downscale_to(img: Image.Image, w: int, h: int) -> Image.Image:
@@ -187,10 +270,14 @@ def compute_upscale_metrics(
             "SSIM": down_cons["SSIM"] - baseline["Downscale_SSIM"],  # upscaled - baseline (positive = better)
         }
 
+    # Get VRAM usage
+    vram_info = get_vram_usage(device)
+    
     return {
         "availability": availability,
         "no_reference": no_ref,
         "downscale_consistency": down_cons,
         "baseline_bicubic": baseline,
         "deltas_vs_bicubic": deltas,
+        "vram_usage": vram_info,
     }

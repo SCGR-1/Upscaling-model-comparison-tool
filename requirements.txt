@@ -14,4 +14,5 @@ basicsr>=1.4.2
 # If installation fails, metrics will be disabled gracefully
 pyiqa>=0.1.0
 scikit-image>=0.19.0
+pynvml  # For GPU VRAM monitoring (optional, will fallback to torch.cuda if not available)
 

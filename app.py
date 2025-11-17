@@ -412,6 +412,10 @@ async def batch_upscale(
                 "deltas_vs_bicubic": {
                     "NIQE": [], "BRISQUE": [], "LaplacianVar": [], "Tenengrad": [],
                     "PSNR": [], "SSIM": []
+                },
+                "vram_usage": {
+                    "allocated_mb": [], "reserved_mb": [], "total_mb": [], "used_mb": [],
+                    "free_mb": [], "utilization_percent": []
                 }
             }
             
@@ -442,6 +446,15 @@ async def batch_upscale(
                     metric_arrays["deltas_vs_bicubic"]["Tenengrad"].append(deltas.get("Tenengrad"))
                     metric_arrays["deltas_vs_bicubic"]["PSNR"].append(deltas.get("PSNR"))
                     metric_arrays["deltas_vs_bicubic"]["SSIM"].append(deltas.get("SSIM"))
+                
+                if m.get("vram_usage"):
+                    vram = m["vram_usage"]
+                    metric_arrays["vram_usage"]["allocated_mb"].append(vram.get("allocated_mb"))
+                    metric_arrays["vram_usage"]["reserved_mb"].append(vram.get("reserved_mb"))
+                    metric_arrays["vram_usage"]["total_mb"].append(vram.get("total_mb"))
+                    metric_arrays["vram_usage"]["used_mb"].append(vram.get("used_mb"))
+                    metric_arrays["vram_usage"]["free_mb"].append(vram.get("free_mb"))
+                    metric_arrays["vram_usage"]["utilization_percent"].append(vram.get("utilization_percent"))
             
             percentiles = {
                 "processing_time": _calculate_percentiles(processing_times) if processing_times else None,
@@ -462,6 +475,14 @@ async def batch_upscale(
                     "Tenengrad": _calculate_percentiles(metric_arrays["deltas_vs_bicubic"]["Tenengrad"]),
                     "PSNR": _calculate_percentiles(metric_arrays["deltas_vs_bicubic"]["PSNR"]),
                     "SSIM": _calculate_percentiles(metric_arrays["deltas_vs_bicubic"]["SSIM"])
+                },
+                "vram_usage": {
+                    "allocated_mb": _calculate_percentiles(metric_arrays["vram_usage"]["allocated_mb"]),
+                    "reserved_mb": _calculate_percentiles(metric_arrays["vram_usage"]["reserved_mb"]),
+                    "total_mb": _calculate_percentiles(metric_arrays["vram_usage"]["total_mb"]),
+                    "used_mb": _calculate_percentiles(metric_arrays["vram_usage"]["used_mb"]),
+                    "free_mb": _calculate_percentiles(metric_arrays["vram_usage"]["free_mb"]),
+                    "utilization_percent": _calculate_percentiles(metric_arrays["vram_usage"]["utilization_percent"])
                 }
             }
         
@@ -573,6 +594,7 @@ async def compute_input_metrics(
                     "filename": filename,
                     "processing_time": img_processing_time,
                     "no_reference": metrics_result.get("no_reference", {}),
+                    "vram_usage": metrics_result.get("vram_usage", {}),
                     "image_size": list(img.size)
                 }
                 
@@ -591,6 +613,10 @@ async def compute_input_metrics(
             metric_arrays = {
                 "no_reference": {
                     "NIQE": [], "BRISQUE": [], "LaplacianVar": [], "Tenengrad": []
+                },
+                "vram_usage": {
+                    "allocated_mb": [], "reserved_mb": [], "total_mb": [], "used_mb": [],
+                    "free_mb": [], "utilization_percent": []
                 }
             }
             processing_times = []
@@ -605,6 +631,15 @@ async def compute_input_metrics(
                     metric_arrays["no_reference"]["BRISQUE"].append(nr.get("BRISQUE"))
                     metric_arrays["no_reference"]["LaplacianVar"].append(nr.get("LaplacianVar"))
                     metric_arrays["no_reference"]["Tenengrad"].append(nr.get("Tenengrad"))
+                
+                if item.get("vram_usage"):
+                    vram = item["vram_usage"]
+                    metric_arrays["vram_usage"]["allocated_mb"].append(vram.get("allocated_mb"))
+                    metric_arrays["vram_usage"]["reserved_mb"].append(vram.get("reserved_mb"))
+                    metric_arrays["vram_usage"]["total_mb"].append(vram.get("total_mb"))
+                    metric_arrays["vram_usage"]["used_mb"].append(vram.get("used_mb"))
+                    metric_arrays["vram_usage"]["free_mb"].append(vram.get("free_mb"))
+                    metric_arrays["vram_usage"]["utilization_percent"].append(vram.get("utilization_percent"))
             
             percentiles = {
                 "processing_time": _calculate_percentiles(processing_times) if processing_times else None,
@@ -613,6 +648,14 @@ async def compute_input_metrics(
                     "BRISQUE": _calculate_percentiles(metric_arrays["no_reference"]["BRISQUE"]),
                     "LaplacianVar": _calculate_percentiles(metric_arrays["no_reference"]["LaplacianVar"]),
                     "Tenengrad": _calculate_percentiles(metric_arrays["no_reference"]["Tenengrad"])
+                },
+                "vram_usage": {
+                    "allocated_mb": _calculate_percentiles(metric_arrays["vram_usage"]["allocated_mb"]),
+                    "reserved_mb": _calculate_percentiles(metric_arrays["vram_usage"]["reserved_mb"]),
+                    "total_mb": _calculate_percentiles(metric_arrays["vram_usage"]["total_mb"]),
+                    "used_mb": _calculate_percentiles(metric_arrays["vram_usage"]["used_mb"]),
+                    "free_mb": _calculate_percentiles(metric_arrays["vram_usage"]["free_mb"]),
+                    "utilization_percent": _calculate_percentiles(metric_arrays["vram_usage"]["utilization_percent"])
                 }
             }
         
